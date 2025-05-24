@@ -2,7 +2,9 @@ package com.vicky7230.d4capp.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,9 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
@@ -20,17 +21,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,30 +45,32 @@ fun PromoBanners(
     modifier: Modifier = Modifier,
     banners: List<PromoBanner>
 ) {
-    val lazyListState = rememberLazyListState()
-    val snappingFlingBehavior = rememberSnapFlingBehavior(lazyListState)
+    val pagerState = rememberPagerState(pageCount = { banners.size })
+    val pagerIsDragged by pagerState.interactionSource.collectIsDraggedAsState()
 
-    var currentIndex by remember { mutableStateOf(0) }
+    val pageInteractionSource = remember { MutableInteractionSource() }
+    val pageIsPressed by pageInteractionSource.collectIsPressedAsState()
 
-    // Auto-scroll every 3s and track index
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(3000)
-            val nextIndex = (currentIndex + 1) % banners.size
-            lazyListState.animateScrollToItem(nextIndex)
-            currentIndex = nextIndex
+    // Stop auto-advancing when pager is dragged or one of the pages is pressed
+    val autoAdvance = !pagerIsDragged && !pageIsPressed
+
+    if (autoAdvance) {
+        LaunchedEffect(pagerState, pageInteractionSource) {
+            while (true) {
+                delay(2000)
+                val nextPage = (pagerState.currentPage + 1) % banners.size
+                pagerState.animateScrollToPage(nextPage)
+            }
         }
     }
 
-    Box {
-        LazyRow(
-            state = lazyListState,
-            modifier = modifier.background(Color.Transparent),
-            flingBehavior = snappingFlingBehavior
-        ) {
-            items(banners) { banner ->
-                Banner(banner = banner)
-            }
+    Box(modifier = modifier.fillMaxWidth()) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth()
+        ) { page ->
+
+            Banner(banner = banners[page])
         }
 
         Row(
@@ -87,7 +86,7 @@ fun PromoBanners(
                         .height(9.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
-                            color = if (index == currentIndex) LemonGreen else Color.Black
+                            color = if (index == pagerState.currentPage) LemonGreen else Color.Black
                         )
                 )
             }
@@ -100,11 +99,9 @@ fun Banner(
     modifier: Modifier = Modifier,
     banner: PromoBanner
 ) {
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-
     Box(
         modifier = modifier
-            .width(screenWidth)
+            .fillMaxWidth()
             .height(250.dp)
     ) {
         Image(
